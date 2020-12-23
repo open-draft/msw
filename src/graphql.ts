@@ -108,6 +108,23 @@ function graphQLRequestHandler<QueryType, VariablesType = Record<string, any>>(
 > {
   const callFrame = getCallFrame()
 
+  function buildRequest(
+    request: GraphQLRequestPayload<VariablesType> & Record<string, any>,
+  ) {
+    const { query, variables } = request as GraphQLRequestPayload<VariablesType>
+
+    const { operationType, operationName } = parseQuery(
+      query,
+      expectedOperationType,
+    )
+
+    return {
+      operationType,
+      operationName,
+      variables,
+    }
+  }
+
   return {
     resolver,
 
@@ -127,36 +144,29 @@ function graphQLRequestHandler<QueryType, VariablesType = Record<string, any>>(
             ? jsonParse<VariablesType>(variablesString)
             : ({} as VariablesType)
 
-          const { operationType, operationName } = parseQuery(
-            query,
-            expectedOperationType,
-          )
+          // There's no spec for using GET with batches.
+          // apollo-link-batch-http only works with POSTs
 
-          return {
-            operationType,
-            operationName,
-            variables,
-          }
+          return buildRequest({ query, variables })
         }
 
         case 'POST': {
-          if (!req.body?.query) {
-            return null
-          }
-
-          const { query, variables } = req.body as GraphQLRequestPayload<
-            VariablesType
-          >
-
-          const { operationType, operationName } = parseQuery(
-            query,
-            expectedOperationType,
-          )
-
-          return {
-            operationType,
-            operationName,
-            variables,
+          if (Array.isArray(req.body)) {
+            // Could be an invalid GraphQL requests, something should probably happen here outside of returning null?
+            // apollo-client will error if there is a different length returned than whats expected, so we'd need to
+            // stub that, or show a dev warning?
+            const hasMissingQueries = req.body.some((r) => !r.query)
+            if (hasMissingQueries) {
+              return null
+            }
+            // Batch operation
+            return req.body.map(buildRequest)
+          } else {
+            if (!req.body?.query) {
+              return null
+            }
+            // Single operation
+            return buildRequest(req.body)
           }
         }
 
@@ -173,20 +183,27 @@ function graphQLRequestHandler<QueryType, VariablesType = Record<string, any>>(
     },
 
     predicate(req, parsed) {
-      if (!parsed || !parsed.operationName) {
+      const toCheck = Array.isArray(parsed) ? parsed : [parsed]
+
+      if (
+        !parsed ||
+        toCheck.some((r) => !r.operationName) // Handle batch requests
+      ) {
         return false
       }
 
       // Match the request URL against a given mask,
       // in case of an endpoint-specific request handler.
+
       const hasMatchingMask = matchRequestUrl(req.url, mask)
 
-      const isMatchingOperation =
+      const hasMatchingOperations = [...toCheck].some((r) =>
         expectedOperationName instanceof RegExp
-          ? expectedOperationName.test(parsed.operationName)
-          : expectedOperationName === parsed.operationName
+          ? expectedOperationName.test(r.operationName)
+          : expectedOperationName === r.operationName,
+      )
 
-      return hasMatchingMask.matches && isMatchingOperation
+      return hasMatchingMask.matches && hasMatchingOperations
     },
 
     defineContext() {
