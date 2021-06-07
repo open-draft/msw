@@ -1,4 +1,8 @@
-import { OperationTypeNode } from 'graphql'
+import {
+  DocumentNode,
+  OperationDefinitionNode,
+  OperationTypeNode,
+} from 'graphql'
 import { Mask, SerializedResponse } from '../setupWorker/glossary'
 import { set } from '../context/set'
 import { status } from '../context/status'
@@ -26,7 +30,7 @@ import { getPublicUrlFromRequest } from '../utils/request/getPublicUrlFromReques
 import { tryCatch } from '../utils/internal/tryCatch'
 
 export type ExpectedOperationTypeNode = OperationTypeNode | 'all'
-export type GraphQLHandlerNameSelector = RegExp | string
+export type GraphQLHandlerNameSelector = RegExp | string | DocumentNode
 
 // GraphQL related context should contain utility functions
 // useful for GraphQL. Functions like `xml()` bear no value
@@ -90,22 +94,54 @@ export class GraphQLHandler<
     endpoint: Mask,
     resolver: ResponseResolver<any, any>,
   ) {
+    const parsedOperationName = GraphQLHandler.parseOperationName(
+      operationType,
+      operationName,
+    )
     const header =
       operationType === 'all'
         ? `${operationType} (origin: ${endpoint.toString()})`
-        : `${operationType} ${operationName} (origin: ${endpoint.toString()})`
+        : `${operationType} ${parsedOperationName} (origin: ${endpoint.toString()})`
 
     super({
       info: {
         header,
         operationType,
-        operationName,
+        operationName: parsedOperationName,
       },
       ctx: graphqlContext,
       resolver,
     })
 
     this.endpoint = endpoint
+  }
+
+  private static parseOperationName(
+    operationType: ExpectedOperationTypeNode,
+    operationName: GraphQLHandlerNameSelector,
+  ) {
+    if (typeof operationName === 'string') return operationName
+    if (operationName instanceof RegExp) return operationName
+
+    // remainder logic in scope attempts to parse operation name out of DocumentNode
+    const operationDef = operationName.definitions.find((def) => {
+      return def.kind === 'OperationDefinition'
+    }) as OperationDefinitionNode
+
+    const parsedOperationType = operationDef?.operation
+    const parsedOperationName = operationDef?.name?.value
+
+    if (parsedOperationType !== operationType) {
+      throw new Error(
+        `Invalid OperationType for DocumentNode provided: expected "${operationType}", got "${parsedOperationType}"`,
+      )
+    }
+
+    if (!parsedOperationName) {
+      throw new Error('Empty operation name for DocumentNode provided.')
+    }
+
+    return parsedOperationName
   }
 
   parse(request: MockedRequest) {

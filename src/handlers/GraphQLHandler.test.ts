@@ -1,6 +1,8 @@
+import { DocumentNode } from 'graphql'
 import { Headers } from 'headers-utils/lib'
 import { context } from '..'
 import { createMockedRequest } from '../../test/support/utils'
+import { GetUserDetailDocument, LoginDocument } from '../graphql.test-data'
 import { response } from '../response'
 import {
   GraphQLContext,
@@ -78,6 +80,134 @@ describe('info', () => {
     expect(handler.info).toHaveProperty('header', 'mutation Login (origin: *)')
     expect(handler.info).toHaveProperty('operationType', 'mutation')
     expect(handler.info).toHaveProperty('operationName', 'Login')
+  })
+
+  test('parses operation name out of DocumentNode for query', () => {
+    const handler = new GraphQLHandler(
+      'query',
+      GetUserDetailDocument,
+      '*',
+      resolver,
+    )
+
+    expect(handler.info).toHaveProperty(
+      'header',
+      'query GetUserDetail (origin: *)',
+    )
+    expect(handler.info).toHaveProperty('operationType', 'query')
+    expect(handler.info).toHaveProperty('operationName', 'GetUserDetail')
+  })
+
+  test('parses operation name out of DocumentNode for mutation', () => {
+    const handler = new GraphQLHandler('mutation', LoginDocument, '*', resolver)
+
+    expect(handler.info).toHaveProperty('header', 'mutation Login (origin: *)')
+    expect(handler.info).toHaveProperty('operationType', 'mutation')
+    expect(handler.info).toHaveProperty('operationName', 'Login')
+  })
+
+  test('throws exception for mismatch operation type on DocumentNode for query', () => {
+    const getUserDetailDocument: DocumentNode = {
+      kind: 'Document',
+      definitions: [
+        {
+          kind: 'OperationDefinition',
+          operation: 'mutation',
+          name: { kind: 'Name', value: 'GetUserDetail' },
+          variableDefinitions: [
+            {
+              kind: 'VariableDefinition',
+              variable: {
+                kind: 'Variable',
+                name: { kind: 'Name', value: 'userId' },
+              },
+              type: {
+                kind: 'NonNullType',
+                type: {
+                  kind: 'NamedType',
+                  name: { kind: 'Name', value: 'String' },
+                },
+              },
+            },
+          ],
+          selectionSet: {
+            kind: 'SelectionSet',
+            selections: [
+              {
+                kind: 'Field',
+                name: { kind: 'Name', value: 'user' },
+                selectionSet: {
+                  kind: 'SelectionSet',
+                  selections: [
+                    { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    expect(
+      () => new GraphQLHandler('query', getUserDetailDocument, '*', resolver),
+    ).toThrowError()
+  })
+
+  test('throws exception for mismatch operation type on DocumentNode for mutation', () => {
+    const loginDocument: DocumentNode = {
+      kind: 'Document',
+      definitions: [
+        {
+          kind: 'OperationDefinition',
+          operation: 'query',
+          name: { kind: 'Name', value: 'Login' },
+          variableDefinitions: [
+            {
+              kind: 'VariableDefinition',
+              variable: {
+                kind: 'Variable',
+                name: { kind: 'Name', value: 'username' },
+              },
+              type: {
+                kind: 'NonNullType',
+                type: {
+                  kind: 'NamedType',
+                  name: { kind: 'Name', value: 'String' },
+                },
+              },
+            },
+          ],
+          selectionSet: {
+            kind: 'SelectionSet',
+            selections: [
+              {
+                kind: 'Field',
+                name: { kind: 'Name', value: 'login' },
+                arguments: [
+                  {
+                    kind: 'Argument',
+                    name: { kind: 'Name', value: 'username' },
+                    value: {
+                      kind: 'Variable',
+                      name: { kind: 'Name', value: 'username' },
+                    },
+                  },
+                ],
+                selectionSet: {
+                  kind: 'SelectionSet',
+                  selections: [
+                    { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    expect(
+      () => new GraphQLHandler('mutation', loginDocument, '*', resolver),
+    ).toThrowError()
   })
 })
 

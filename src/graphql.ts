@@ -1,5 +1,7 @@
 import { Mask } from './setupWorker/glossary'
 import { ResponseResolver } from './handlers/RequestHandler'
+import { TypedDocumentNode } from '@graphql-typed-document-node/core'
+import { DocumentNode } from 'graphql'
 import {
   GraphQLHandler,
   GraphQLContext,
@@ -17,7 +19,10 @@ function createScopedGraphQLHandler(
     Query extends Record<string, any>,
     Variables extends GraphQLVariables = GraphQLVariables
   >(
-    operationName: GraphQLHandlerNameSelector,
+    operationName:
+      | GraphQLHandlerNameSelector
+      | TypedDocumentNode<Query, Variables>
+      | DocumentNode,
     resolver: ResponseResolver<
       GraphQLRequest<Variables>,
       GraphQLContext<Query>
