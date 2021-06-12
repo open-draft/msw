@@ -1,5 +1,11 @@
 import { parse } from 'graphql'
 import { graphql } from 'msw'
+import {
+  GetUserDetailDocument,
+  GetUserDetailQueryVariables,
+  LoginDocument,
+  LoginMutationVariables,
+} from 'graphql.test-data'
 
 graphql.query<{ key: string }>('', (req, res, ctx) => {
   return res(
@@ -52,7 +58,7 @@ graphql.operation<
   return res(ctx.data({ key: 'pass' }))
 })
 
-// Supports "DocumentNode" as the GraphQL operation name.
+// Supports `DocumentNode` as the GraphQL operation name.
 const getUser = parse(`
   query GetUser {
     user {
@@ -70,3 +76,25 @@ const createUser = parse(`
   }
 `)
 graphql.mutation(createUser, (req, res, ctx) => res(ctx.data({})))
+
+// Supports `TypedDocumentNode`as the GraphQL operation name.
+graphql.query(GetUserDetailDocument, (req, res, ctx) => {
+  const variables: GetUserDetailQueryVariables = req.variables
+
+  return res(
+    ctx.data(
+      // @ts-expect-error Response data doesn't match the query type.
+      {},
+    ),
+  )
+})
+
+graphql.mutation(LoginDocument, (req, res, ctx) => {
+  const variables: LoginMutationVariables = req.variables
+  return res(
+    ctx.data(
+      // @ts-expect-error Response data doesn't match the query type.
+      {},
+    ),
+  )
+})
