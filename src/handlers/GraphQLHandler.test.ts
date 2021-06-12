@@ -1,14 +1,14 @@
-import { DocumentNode } from 'graphql'
+import { parse } from 'graphql'
 import { Headers } from 'headers-utils/lib'
 import { context } from '..'
 import { createMockedRequest } from '../../test/support/utils'
-import { GetUserDetailDocument, LoginDocument } from '../graphql.test-data'
 import { response } from '../response'
 import {
   GraphQLContext,
   GraphQLHandler,
   GraphQLRequest,
   GraphQLRequestBody,
+  isDocumentNode,
 } from './GraphQLHandler'
 import { MockedRequest, ResponseResolver } from './RequestHandler'
 
@@ -82,132 +82,49 @@ describe('info', () => {
     expect(handler.info).toHaveProperty('operationName', 'Login')
   })
 
-  test('parses operation name out of DocumentNode for query', () => {
-    const handler = new GraphQLHandler(
-      'query',
-      GetUserDetailDocument,
-      '*',
-      resolver,
-    )
+  test('parses a query operation name from a given DocumentNode', () => {
+    const node = parse(`
+      query GetUser {
+        user {
+          firstName
+        }
+      }
+    `)
 
-    expect(handler.info).toHaveProperty(
-      'header',
-      'query GetUserDetail (origin: *)',
-    )
+    const handler = new GraphQLHandler('query', node, '*', resolver)
+
+    expect(handler.info).toHaveProperty('header', 'query GetUser (origin: *)')
     expect(handler.info).toHaveProperty('operationType', 'query')
-    expect(handler.info).toHaveProperty('operationName', 'GetUserDetail')
+    expect(handler.info).toHaveProperty('operationName', 'GetUser')
   })
 
-  test('parses operation name out of DocumentNode for mutation', () => {
-    const handler = new GraphQLHandler('mutation', LoginDocument, '*', resolver)
+  test('parses a mutation operation name from a given DocumentNode', () => {
+    const node = parse(`
+      mutation Login {
+        user {
+          id
+        }
+      }
+    `)
+    const handler = new GraphQLHandler('mutation', node, '*', resolver)
 
     expect(handler.info).toHaveProperty('header', 'mutation Login (origin: *)')
     expect(handler.info).toHaveProperty('operationType', 'mutation')
     expect(handler.info).toHaveProperty('operationName', 'Login')
   })
 
-  test('throws exception for mismatch operation type on DocumentNode for query', () => {
-    const getUserDetailDocument: DocumentNode = {
-      kind: 'Document',
-      definitions: [
-        {
-          kind: 'OperationDefinition',
-          operation: 'mutation',
-          name: { kind: 'Name', value: 'GetUserDetail' },
-          variableDefinitions: [
-            {
-              kind: 'VariableDefinition',
-              variable: {
-                kind: 'Variable',
-                name: { kind: 'Name', value: 'userId' },
-              },
-              type: {
-                kind: 'NonNullType',
-                type: {
-                  kind: 'NamedType',
-                  name: { kind: 'Name', value: 'String' },
-                },
-              },
-            },
-          ],
-          selectionSet: {
-            kind: 'SelectionSet',
-            selections: [
-              {
-                kind: 'Field',
-                name: { kind: 'Name', value: 'user' },
-                selectionSet: {
-                  kind: 'SelectionSet',
-                  selections: [
-                    { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-      ],
-    }
-    expect(
-      () => new GraphQLHandler('query', getUserDetailDocument, '*', resolver),
-    ).toThrowError()
-  })
+  test('throws an exception given a DocumentNode with a mismatched operation type', () => {
+    const node = parse(`
+      mutation CreateUser {
+        user {
+          firstName
+        }
+      }
+    `)
 
-  test('throws exception for mismatch operation type on DocumentNode for mutation', () => {
-    const loginDocument: DocumentNode = {
-      kind: 'Document',
-      definitions: [
-        {
-          kind: 'OperationDefinition',
-          operation: 'query',
-          name: { kind: 'Name', value: 'Login' },
-          variableDefinitions: [
-            {
-              kind: 'VariableDefinition',
-              variable: {
-                kind: 'Variable',
-                name: { kind: 'Name', value: 'username' },
-              },
-              type: {
-                kind: 'NonNullType',
-                type: {
-                  kind: 'NamedType',
-                  name: { kind: 'Name', value: 'String' },
-                },
-              },
-            },
-          ],
-          selectionSet: {
-            kind: 'SelectionSet',
-            selections: [
-              {
-                kind: 'Field',
-                name: { kind: 'Name', value: 'login' },
-                arguments: [
-                  {
-                    kind: 'Argument',
-                    name: { kind: 'Name', value: 'username' },
-                    value: {
-                      kind: 'Variable',
-                      name: { kind: 'Name', value: 'username' },
-                    },
-                  },
-                ],
-                selectionSet: {
-                  kind: 'SelectionSet',
-                  selections: [
-                    { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-      ],
-    }
-    expect(
-      () => new GraphQLHandler('mutation', loginDocument, '*', resolver),
-    ).toThrowError()
+    expect(() => new GraphQLHandler('query', node, '*', resolver)).toThrow(
+      'Failed to create a GraphQL handler: provided a DocumentNode with a mismatched operation type (expected "query", but got "mutation").',
+    )
   })
 })
 
@@ -499,5 +416,27 @@ describe('run', () => {
     const result = await handler.run(request)
 
     expect(result).toBeNull()
+  })
+})
+
+describe('isDocumentNode', () => {
+  it('returns true given a valid DocumentNode', () => {
+    const node = parse(`
+      query GetUser {
+        user {
+          login
+        }
+      }
+    `)
+
+    expect(isDocumentNode(node)).toEqual(true)
+  })
+
+  it('returns false given an arbitrary input', () => {
+    expect(isDocumentNode(null)).toEqual(false)
+    expect(isDocumentNode(undefined)).toEqual(false)
+    expect(isDocumentNode('')).toEqual(false)
+    expect(isDocumentNode('value')).toEqual(false)
+    expect(isDocumentNode(/value/)).toEqual(false)
   })
 })

@@ -1,7 +1,7 @@
+import { DocumentNode } from 'graphql'
+import { TypedDocumentNode } from '@graphql-typed-document-node/core'
 import { Mask } from './setupWorker/glossary'
 import { ResponseResolver } from './handlers/RequestHandler'
-import { TypedDocumentNode } from '@graphql-typed-document-node/core'
-import { DocumentNode } from 'graphql'
 import {
   GraphQLHandler,
   GraphQLContext,

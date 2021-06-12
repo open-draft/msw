@@ -1,3 +1,4 @@
+import { parse } from 'graphql'
 import { graphql } from 'msw'
 
 graphql.query<{ key: string }>('', (req, res, ctx) => {
@@ -50,3 +51,22 @@ graphql.operation<
 >((req, res, ctx) => {
   return res(ctx.data({ key: 'pass' }))
 })
+
+// Supports "DocumentNode" as the GraphQL operation name.
+const getUser = parse(`
+  query GetUser {
+    user {
+      firstName
+    }
+  }
+`)
+graphql.query(getUser, (req, res, ctx) => res(ctx.data({})))
+
+const createUser = parse(`
+  mutation CreateUser {
+    user {
+      id
+    }
+  }
+`)
+graphql.mutation(createUser, (req, res, ctx) => res(ctx.data({})))
