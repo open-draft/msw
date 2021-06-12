@@ -1,5 +1,4 @@
 import { DocumentNode } from 'graphql'
-import { TypedDocumentNode } from '@graphql-typed-document-node/core'
 import { Mask } from './setupWorker/glossary'
 import { ResponseResolver } from './handlers/RequestHandler'
 import {
@@ -11,6 +10,15 @@ import {
   GraphQLHandlerNameSelector,
 } from './handlers/GraphQLHandler'
 
+export interface TypedDocumentNode<Result = {
+  [key: string]: any;
+}, Variables = {
+  [key: string]: any;
+}> extends DocumentNode {
+  __resultType?: Result;
+  __variablesType?: Variables;
+}
+
 function createScopedGraphQLHandler(
   operationType: ExpectedOperationTypeNode,
   url: Mask,
@@ -21,8 +29,8 @@ function createScopedGraphQLHandler(
   >(
     operationName:
       | GraphQLHandlerNameSelector
-      | TypedDocumentNode<Query, Variables>
-      | DocumentNode,
+      | DocumentNode
+      | TypedDocumentNode<Query, Variables>,
     resolver: ResponseResolver<
       GraphQLRequest<Variables>,
       GraphQLContext<Query>
