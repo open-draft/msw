@@ -10,13 +10,16 @@ import {
   GraphQLHandlerNameSelector,
 } from './handlers/GraphQLHandler'
 
-export interface TypedDocumentNode<Result = {
-  [key: string]: any;
-}, Variables = {
-  [key: string]: any;
-}> extends DocumentNode {
-  __resultType?: Result;
-  __variablesType?: Variables;
+export interface TypedDocumentNode<
+  Result = {
+    [key: string]: any
+  },
+  Variables = {
+    [key: string]: any
+  }
+> extends DocumentNode {
+  __resultType?: Result
+  __variablesType?: Variables
 }
 
 function createScopedGraphQLHandler(
