@@ -1,6 +1,6 @@
 {
   "name": "msw",
-  "version": "0.30.1",
+  "version": "0.31.0-beta.0",
   "description": "Seamless REST/GraphQL API mocking library for browser and Node.js.",
   "main": "lib/umd/index.js",
   "module": "lib/esm/index.js",
@@ -61,7 +61,7 @@
   "sideEffects": false,
   "dependencies": {
     "@mswjs/cookies": "^0.1.5",
-    "@mswjs/interceptors": "^0.11.1",
+    "@mswjs/interceptors": "^0.12.0",
     "@open-draft/until": "^1.0.3",
     "@types/cookie": "^0.4.0",
     "@types/inquirer": "^7.3.1",
