@@ -1,3 +1,4 @@
+import { parse } from 'graphql'
 import { Headers } from 'headers-utils/lib'
 import { context } from '..'
 import { createMockedRequest } from '../../test/support/utils'
@@ -7,6 +8,7 @@ import {
   GraphQLHandler,
   GraphQLRequest,
   GraphQLRequestBody,
+  isDocumentNode,
 } from './GraphQLHandler'
 import { MockedRequest, ResponseResolver } from './RequestHandler'
 
@@ -78,6 +80,51 @@ describe('info', () => {
     expect(handler.info).toHaveProperty('header', 'mutation Login (origin: *)')
     expect(handler.info).toHaveProperty('operationType', 'mutation')
     expect(handler.info).toHaveProperty('operationName', 'Login')
+  })
+
+  test('parses a query operation name from a given DocumentNode', () => {
+    const node = parse(`
+      query GetUser {
+        user {
+          firstName
+        }
+      }
+    `)
+
+    const handler = new GraphQLHandler('query', node, '*', resolver)
+
+    expect(handler.info).toHaveProperty('header', 'query GetUser (origin: *)')
+    expect(handler.info).toHaveProperty('operationType', 'query')
+    expect(handler.info).toHaveProperty('operationName', 'GetUser')
+  })
+
+  test('parses a mutation operation name from a given DocumentNode', () => {
+    const node = parse(`
+      mutation Login {
+        user {
+          id
+        }
+      }
+    `)
+    const handler = new GraphQLHandler('mutation', node, '*', resolver)
+
+    expect(handler.info).toHaveProperty('header', 'mutation Login (origin: *)')
+    expect(handler.info).toHaveProperty('operationType', 'mutation')
+    expect(handler.info).toHaveProperty('operationName', 'Login')
+  })
+
+  test('throws an exception given a DocumentNode with a mismatched operation type', () => {
+    const node = parse(`
+      mutation CreateUser {
+        user {
+          firstName
+        }
+      }
+    `)
+
+    expect(() => new GraphQLHandler('query', node, '*', resolver)).toThrow(
+      'Failed to create a GraphQL handler: provided a DocumentNode with a mismatched operation type (expected "query", but got "mutation").',
+    )
   })
 })
 
@@ -369,5 +416,27 @@ describe('run', () => {
     const result = await handler.run(request)
 
     expect(result).toBeNull()
+  })
+})
+
+describe('isDocumentNode', () => {
+  it('returns true given a valid DocumentNode', () => {
+    const node = parse(`
+      query GetUser {
+        user {
+          login
+        }
+      }
+    `)
+
+    expect(isDocumentNode(node)).toEqual(true)
+  })
+
+  it('returns false given an arbitrary input', () => {
+    expect(isDocumentNode(null)).toEqual(false)
+    expect(isDocumentNode(undefined)).toEqual(false)
+    expect(isDocumentNode('')).toEqual(false)
+    expect(isDocumentNode('value')).toEqual(false)
+    expect(isDocumentNode(/value/)).toEqual(false)
   })
 })
